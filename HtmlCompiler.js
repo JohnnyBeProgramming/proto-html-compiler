@@ -163,6 +163,10 @@ var HtmlCompiler = {
 
     parseElem: function (item, parentIdent) {
         var output = null;
+        var compileOtps = 'html-compile' in item.attribs ? item.attribs['html-compile'] : null;
+        if (compileOtps == 'none') {
+            return output;
+        }
         switch (item.type) {
             case 'tag':
                 switch (item.name) {
@@ -344,7 +348,7 @@ var HtmlCompiler = {
     },
 
     inspectGroup: function (domElem, parentIdent) {
-        var result = [];
+        var result = [];        
         if (domElem.children) {
             domElem.children.forEach(function (item) {
                 var output = HtmlCompiler.parseElem(item, parentIdent);
