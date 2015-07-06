@@ -1,0 +1,33 @@
+{
+  "name": "proto-html-compiler",
+  "version": "1.0.0",
+  "description": "Prototyped HTML DOM Parser and compiler",
+  "main": "HtmlCompiler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JohnnyBeProgramming/proto-html-compiler"
+  },
+  "keywords": [
+    "prototyped",
+    "html",
+    "compiler"
+  ],
+  "author": "Johnathan Lodder <Johnathan.Lodder@Gmail.com> (http://www.prototyped.info/)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/JohnnyBeProgramming/proto-html-compiler/issues"
+  },
+  "homepage": "https://github.com/JohnnyBeProgramming/proto-html-compiler",
+  "dependencies": {
+    "htmlparser": "^1.7.7",
+    "htmlparser-to-html": "0.0.5",
+    "proto-js-string": "^1.0.0",
+    "uglify-js": "^2.4.23"
+  },
+  "devDependencies": {
+    "q": "^1.4.1"
+  }
+}
