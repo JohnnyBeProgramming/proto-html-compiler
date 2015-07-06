@@ -26,17 +26,38 @@ var HtmlCompiler = {
         ] : []),
     },
     spx: new sp(),
+    ctx: function (options) {
+        var opts = options || {};
+        for (var prop in HtmlCompiler.opts) {
+            if (prop in opts == false) {
+                opts[prop] = HtmlCompiler.opts[prop];
+            }
+        }
+        return opts;
+    },
 
-    html: function (file, contents) {
+    hashCode: function (val) {
+        var hash = 0, i, chr, len;
+        if (val.length == 0) return hash;
+        for (i = 0, len = val.length; i < len; i++) {
+            chr = val.charCodeAt(i);
+            hash = ((hash << 5) - hash) + chr;
+            hash |= 0; // Convert to 32bit integer
+        }
+        return hash;
+    },
+
+    html: function (file, contents, options) {
         return HtmlCompiler
-            .gen(file, contents)
+            .gen(file, contents, options)
             .then(function (output) {
-                return HtmlCompiler.genFile(file, output);
+                return HtmlCompiler.genFile(file, output, options);
             });
     },
 
-    gen: function (file, contents, callback) {
+    gen: function (file, contents, options) {
         var deferred = q.defer();
+        var opts = HtmlCompiler.ctx(options);
 
         // Strip non-html prefix
         var pilot = contents.indexOf('<html');
@@ -52,25 +73,22 @@ var HtmlCompiler = {
                     lang: html.attribs.lang,
                     head: [],
                     body: [],
-                    clean: HtmlCompiler.opts.clearHtml,
+                    clean: opts.clearHtml,
                 };
 
                 html.children.forEach(function (child) {
                     if (child.type == 'tag') {
                         switch (child.name) {
                             case 'head':
-                                output.head = HtmlCompiler.inspectGroup(child, 'document.head');
+                                output.head = HtmlCompiler.inspectGroup(child, 'document.head', options);
                                 break;
                             case 'body':
-                                output.body = HtmlCompiler.inspectGroup(child, 'document.body');
+                                output.body = HtmlCompiler.inspectGroup(child, 'document.body', options);
                                 break;
                         }
                     }
                 });
 
-                if (callback) {
-                    callback(output);
-                }
                 deferred.resolve(output);
             }
         });
@@ -81,18 +99,19 @@ var HtmlCompiler = {
         return deferred.promise;
     },
 
-    genFile: function (filename, output) {
+    genFile: function (filename, output, options) {
 
         // Generate Data (sync)
-        HtmlCompiler.genJSON(filename, output);
+        HtmlCompiler.genJSON(filename, output, options);
 
         // Generate the compiled script (async)
-        return HtmlCompiler.genScript(filename, output);
+        return HtmlCompiler.genScript(filename, output, options);
     },
 
-    genJSON: function (filename, output) {
+    genJSON: function (filename, output, options) {
+        var opts = HtmlCompiler.ctx(options);
         var contents = JSON.stringify(output, null, 4);
-        var targetPath = path.join((HtmlCompiler.opts.dest || process.cwd()), 'data/');
+        var targetPath = path.join((opts.dest || process.cwd()), 'data/');
         var targetJSON = path.join(targetPath, filename + '.json');
         if (!fs.existsSync(targetPath)) {
             fs.mkdirSync(targetPath);
@@ -100,11 +119,12 @@ var HtmlCompiler = {
         fs.writeFileSync(targetJSON, contents);
     },
 
-    genScript: function (filename, output) {
+    genScript: function (filename, output, options) {
         var q = require('q');
         var deferred = q.defer();
+        var opts = HtmlCompiler.ctx(options);
 
-        var targetPath = path.join((HtmlCompiler.opts.dest || process.cwd()), 'script/');
+        var targetPath = path.join((opts.dest || process.cwd()), 'script/');
         if (!fs.existsSync(targetPath)) {
             fs.mkdirSync(targetPath);
         }
@@ -125,21 +145,22 @@ var HtmlCompiler = {
         return deferred.promise;
     },
 
-    genMinified: function (fileContents) {
+    genMinified: function (fileContents, options) {
+        var opts = HtmlCompiler.ctx(options);
         try {
             // Check for minification?
-            var opts = { fromString: true };
-            if (HtmlCompiler.opts.minifyScripts) {
-                opts = {
+            var prefs = { fromString: true };
+            if (opts.minifyScripts) {
+                prefs = {
                     fromString: true,
                     mangle: {},
                     warnings: false,
                     compress: {
-                        pure_funcs: HtmlCompiler.opts.excludeStatements,
+                        pure_funcs: opts.excludeStatements,
                     }
                 };
             } else {
-                opts = {
+                prefs = {
                     fromString: true,
                     mangle: false,
                     compress: false
@@ -147,7 +168,7 @@ var HtmlCompiler = {
             }
 
             var UglifyJS = require("uglify-js");
-            var minified = UglifyJS.minify(fileContents, opts);
+            var minified = UglifyJS.minify(fileContents, prefs);
 
             fileContents = minified.code;
 
@@ -161,11 +182,16 @@ var HtmlCompiler = {
         return toHtml(item);
     },
 
-    parseElem: function (item, parentIdent) {
+    parseElem: function (item, parentIdent, options) {
         var output = null;
-        var compileOtps = 'html-compile' in item.attribs ? item.attribs['html-compile'] : null;
+        var opts = options || HtmlCompiler.opts;
+        var attrs = item.attribs || {};
+        var compileOtps = null;
+        if ('html-compile' in attrs) {
+            compileOtps = attrs['html-compile'];
+        }
         if (compileOtps == 'none') {
-            return output;
+            return null;
         }
         switch (item.type) {
             case 'tag':
@@ -174,7 +200,7 @@ var HtmlCompiler = {
                         if (item.attribs && item.attribs.href) {
                             output = {
                                 type: 'script',
-                                text: HtmlCompiler.opts.prefix + '.base("' + item.attribs.href + '");',
+                                text: opts.prefix + '.base("' + item.attribs.href + '");',
                             };
                         }
                         break;
@@ -182,13 +208,13 @@ var HtmlCompiler = {
                         if (!item.children.length) break;
                         output = {
                             type: 'script',
-                            text: HtmlCompiler.opts.prefix + '.title(' + JSON.stringify(item.children[0].data) + ');',
+                            text: opts.prefix + '.title(' + JSON.stringify(item.children[0].data) + ');',
                         };
                         break;
                     case 'meta':
                         output = {
                             type: 'script',
-                            text: HtmlCompiler.opts.prefix + '.meta(' + JSON.stringify(item.attribs) + ');',
+                            text: opts.prefix + '.meta(' + JSON.stringify(item.attribs) + ');',
                         };
                         break;
                     case 'link':
@@ -198,9 +224,8 @@ var HtmlCompiler = {
                         if (isUrl && item.attribs.rel == 'stylesheet') {
                             // Try and fetch local file
                             var relPath = item.attribs.href;
-                            var filePath = path.join(HtmlCompiler.opts.base, relPath);
+                            var filePath = path.join(opts.base, relPath);
                             if (fs.existsSync(filePath)) {
-                                // Do something
                                 var buffer = fs.readFileSync(filePath, 'utf8');
                                 isUrl = false;
                                 data = buffer;
@@ -208,13 +233,9 @@ var HtmlCompiler = {
                             type = 'style';
                         }
 
-                        if (!isUrl && data) {
-                            // ToDo: Encode the script...
-                        }
-
                         output = {
                             type: 'script',
-                            text: HtmlCompiler.opts.prefix + '.' + type + '(' + JSON.stringify(data) + ');',
+                            text: opts.prefix + '.' + type + '(' + JSON.stringify(data) + ', ' + parentIdent + ');',
                         };
                         break;
                     default:
@@ -227,9 +248,11 @@ var HtmlCompiler = {
                 }
                 break;
             case 'style':
+                if (!item.children.length) break;
+                var data = item.children[0].data;
                 output = {
                     type: 'script',
-                    text: HtmlCompiler.opts.prefix + '.style(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
+                    text: opts.prefix + '.style(' + JSON.stringify(data) + ', ' + parentIdent + ');',
                 };
                 break;
             case 'script':
@@ -237,7 +260,7 @@ var HtmlCompiler = {
                 var data = isUrl ? item.attribs.src : item.children[0].data;
                 if (isUrl) {
                     // Try and fetch local file
-                    var filePath = path.join(HtmlCompiler.opts.base, data);
+                    var filePath = path.join(opts.base, data);
                     if (fs.existsSync(filePath)) {
                         // Do something
                         var buffer = fs.readFileSync(filePath, 'utf8');
@@ -248,12 +271,12 @@ var HtmlCompiler = {
 
                 output = {
                     type: 'script',
-                    text: HtmlCompiler.opts.prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
+                    text: opts.prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
                 };
                 break;
             case 'text':
                 // Check if not empty?
-                if (!HtmlCompiler.opts.trimWhiteSpace || !item.data.replace(/ +?/g, '')) {
+                if (!opts.trimWhiteSpace || !item.data.replace(/ +?/g, '')) {
                     output = {
                         type: 'text',
                         text: item.data,
@@ -263,7 +286,7 @@ var HtmlCompiler = {
 
             case 'comment':
                 // Disable comments?
-                if (!HtmlCompiler.opts.ignoreComments) {
+                if (!opts.ignoreComments) {
                     output = {
                         type: 'comment',
                         text: item.data,
@@ -277,17 +300,18 @@ var HtmlCompiler = {
         return output;
     },
 
-    scriptElems: function (output, parentIdent) {
+    scriptElems: function (output, parentIdent, options) {
         var list = [];
+        var opts = options || HtmlCompiler.opts;
         if (output && output.length) {
             output.forEach(function (item) {
                 // Check if the tag can be converted to a script
                 switch (item.type) {
                     case 'comment':
-                        if (!HtmlCompiler.opts.ignoreComments) {
+                        if (!opts.ignoreComments) {
                             item = {
                                 type: 'script',
-                                text: HtmlCompiler.opts.prefix + '.comment(' + parentIdent + ',' + JSON.stringify(item.text) + ');',
+                                text: opts.prefix + '.comment(' + parentIdent + ',' + JSON.stringify(item.text) + ');',
                             };
                         } else {
                             // Remove comments
@@ -297,7 +321,7 @@ var HtmlCompiler = {
                     case 'html':
                         item = {
                             type: 'script',
-                            text: HtmlCompiler.opts.prefix + '.html(' + parentIdent + ',' + JSON.stringify(item.text) + ');',
+                            text: opts.prefix + '.html(' + parentIdent + ',' + JSON.stringify(item.text) + ');',
                         };
                         break;
                 }
@@ -310,25 +334,15 @@ var HtmlCompiler = {
         return list;
     },
 
-    hashCode: function (val) {
-        var hash = 0, i, chr, len;
-        if (val.length == 0) return hash;
-        for (i = 0, len = val.length; i < len; i++) {
-            chr = val.charCodeAt(i);
-            hash = ((hash << 5) - hash) + chr;
-            hash |= 0; // Convert to 32bit integer
-        }
-        return hash;
-    },
-
-    compressScripts: function (output, parentIdent) {
+    compressScripts: function (output, parentIdent, options) {
         // ToDo: Make Compression work...
         var list = [];
+        var opts = options || HtmlCompiler.opts;
         if (output && output.length) {
             output.forEach(function (item) {
                 if (!item.text) return;
                 if (item.type == 'script') {
-                    var pre = (HtmlCompiler.opts.compressPrefix || '');
+                    var pre = (opts.compressPrefix || '');
                     if (pre == '') {
                         var payload = item.text.replace(/( *\r\n *)/g, '');
                         var checksum = spx.encoders.md5(payload);
@@ -347,29 +361,30 @@ var HtmlCompiler = {
         return list;
     },
 
-    inspectGroup: function (domElem, parentIdent) {
-        var result = [];        
+    inspectGroup: function (domElem, parentIdent, options) {
+        var result = [];
+        var opts = options || HtmlCompiler.opts;
         if (domElem.children) {
             domElem.children.forEach(function (item) {
-                var output = HtmlCompiler.parseElem(item, parentIdent);
+                var output = HtmlCompiler.parseElem(item, parentIdent, options);
                 if (output) {
                     result.push(output);
                 }
             });
         }
-        if (HtmlCompiler.opts.scriptElements) {
-            result = HtmlCompiler.scriptElems(result, parentIdent);
+        if (opts.scriptElements) {
+            result = HtmlCompiler.scriptElems(result, parentIdent, options);
         }
-        if (HtmlCompiler.opts.mergeGroups) {
-            result = HtmlCompiler.mergeGroups(result);
+        if (opts.mergeGroups) {
+            result = HtmlCompiler.mergeGroups(result, options);
         }
-        if (HtmlCompiler.opts.compressContents) {
-            result = HtmlCompiler.compressScripts(result, parentIdent);
+        if (opts.compressContents) {
+            result = HtmlCompiler.compressScripts(result, parentIdent, options);
         }
         return result;
     },
 
-    mergeGroups: function (nodes) {
+    mergeGroups: function (nodes, options) {
         if (!nodes.length) return nodes;
         var newNodes = [];
         var lastNode = null;
