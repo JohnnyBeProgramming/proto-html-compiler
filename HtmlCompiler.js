@@ -3,28 +3,27 @@ var path = require('path');
 var fs = require('fs');
 var q = require('q');
 
-var debug = true;
 var toHtml = require('htmlparser-to-html');
+var defaults = {
+    base: './',
+    dest: 'gen/',
+    debug: false,
+    prefix: '$__$',
+    clearHtml: false,
+    mergeGroups: true,
+    minifyScripts: true,
+    scriptElements: true,
+    ignoreComments: false,
+    compressPrefix: null,
+    compressContents: false,
+    trimWhiteSpace: true,
+    excludeStatements: [
+        // Functions to exclude....
+        //'console.log', 
+    ],
+};
 var HtmlCompiler = {
-    opts: {
-        base: './',
-        dest: './gen',
-        debug: false,
-        prefix: '$__$',
-        clearHtml: false,
-        mergeGroups: true,
-        minifyScripts: true,
-        scriptElements: true,
-        ignoreComments: false,
-        compressPrefix: null,
-        compressContents: false,
-        trimWhiteSpace: true,
-        excludeStatements: [
-            'console.debug',
-        ].concat(!debug ? [
-            'console.log',
-        ] : []),
-    },
+    opts: defaults,
     spx: new sp(),
     ctx: function (options) {
         var opts = options || {};
@@ -45,6 +44,17 @@ var HtmlCompiler = {
             hash |= 0; // Convert to 32bit integer
         }
         return hash;
+    },
+
+    init: function (options) {
+        try {
+            HtmlCompiler.opts = defaults;
+            HtmlCompiler.opts = HtmlCompiler.ctx(options);
+        }
+        catch (ex) {
+            console.log('Error: ' + ex.message)
+        }
+        return HtmlCompiler.opts;
     },
 
     html: function (file, contents, options) {
@@ -156,7 +166,7 @@ var HtmlCompiler = {
                     mangle: {},
                     warnings: false,
                     compress: {
-                        pure_funcs: opts.excludeStatements,
+                        pure_funcs: (!opts.debug ? ['console.debug'] : []).concat(opts.excludeStatements),
                     }
                 };
             } else {
@@ -256,16 +266,24 @@ var HtmlCompiler = {
                 };
                 break;
             case 'script':
-                var isUrl = item.attribs && item.attribs.src;
-                var data = isUrl ? item.attribs.src : item.children[0].data;
+                var isUrl = item.attribs && item.attribs.src ? true : false;
+                var data = isUrl
+                            ? item.attribs.src
+                            : (item.children.length ? item.children[0].data : null);
+
                 if (isUrl) {
                     // Try and fetch local file
                     var filePath = path.join(opts.base, data);
                     if (fs.existsSync(filePath)) {
-                        // Do something
-                        var buffer = fs.readFileSync(filePath, 'utf8');
-                        isUrl = false;
-                        data = buffer;
+                        try {
+                            var buffer = fs.readFileSync(filePath, 'utf8');
+                            isUrl = false;
+                            data = buffer;
+                        } catch (ex) {
+                            console.log('Error: ' + ex.message);
+                        }
+                    } else {
+                        // Online URL...
                     }
                 }
 
@@ -273,6 +291,7 @@ var HtmlCompiler = {
                     type: 'script',
                     text: opts.prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
                 };
+
                 break;
             case 'text':
                 // Check if not empty?
