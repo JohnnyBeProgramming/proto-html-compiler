@@ -11,9 +11,10 @@ var defaults = {
     prefix: '$__$',
     clearHtml: false,
     mergeGroups: true,
+    queueActions: true,
     minifyScripts: true,
     scriptElements: true,
-    ignoreComments: false,
+    ignoreComments: true,
     compressPrefix: null,
     compressContents: false,
     trimWhiteSpace: true,
@@ -177,7 +178,7 @@ var HtmlCompiler = {
                 }
             }
 
-            var UglifyJS = require("uglify-js");
+            var UglifyJS = require('uglify-js');
             var minified = UglifyJS.minify(fileContents, prefs);
 
             fileContents = minified.code;
@@ -203,28 +204,31 @@ var HtmlCompiler = {
         if (compileOtps == 'none') {
             return null;
         }
+
+        var prefix = opts.queueActions ? opts.prefix + '.queue' : opts.prefix;
         switch (item.type) {
             case 'tag':
                 switch (item.name) {
                     case 'base':
                         if (item.attribs && item.attribs.href) {
                             output = {
-                                type: 'script',
-                                text: opts.prefix + '.base("' + item.attribs.href + '");',
+                                type: 'base',
+                                text: item.attribs.href,
                             };
                         }
                         break;
                     case 'title':
-                        if (!item.children.length) break;
-                        output = {
-                            type: 'script',
-                            text: opts.prefix + '.title(' + JSON.stringify(item.children[0].data) + ');',
-                        };
+                        if (item.children.length) {
+                            output = {
+                                type: 'title',
+                                text: item.children[0].data,
+                            };
+                        }
                         break;
                     case 'meta':
                         output = {
-                            type: 'script',
-                            text: opts.prefix + '.meta(' + JSON.stringify(item.attribs) + ');',
+                            type: 'meta',
+                            text: item.attribs,
                         };
                         break;
                     case 'link':
@@ -238,14 +242,17 @@ var HtmlCompiler = {
                             if (fs.existsSync(filePath)) {
                                 var buffer = fs.readFileSync(filePath, 'utf8');
                                 isUrl = false;
+                                type = 'style';
                                 data = buffer;
+                            } else {
+                                type = 'link';
+                                data = item.attribs;
                             }
-                            type = 'style';
                         }
 
                         output = {
-                            type: 'script',
-                            text: opts.prefix + '.' + type + '(' + JSON.stringify(data) + ', ' + parentIdent + ');',
+                            type: type,
+                            text: data,
                         };
                         break;
                     default:
@@ -261,8 +268,8 @@ var HtmlCompiler = {
                 if (!item.children.length) break;
                 var data = item.children[0].data;
                 output = {
-                    type: 'script',
-                    text: opts.prefix + '.style(' + JSON.stringify(data) + ', ' + parentIdent + ');',
+                    type: 'style',
+                    text: data,
                 };
                 break;
             case 'script':
@@ -289,7 +296,7 @@ var HtmlCompiler = {
 
                 output = {
                     type: 'script',
-                    text: opts.prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
+                    text: prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
                 };
 
                 break;
@@ -322,15 +329,68 @@ var HtmlCompiler = {
     scriptElems: function (output, parentIdent, options) {
         var list = [];
         var opts = options || HtmlCompiler.opts;
+        var prefix = opts.queueActions ? opts.prefix + '.queue' : opts.prefix;
         if (output && output.length) {
             output.forEach(function (item) {
                 // Check if the tag can be converted to a script
                 switch (item.type) {
+                    case 'base':
+                        if (item.text) {
+                            item = {
+                                type: 'script',
+                                text: prefix + '.base(' + JSON.stringify(item.text) + ');',
+                            };
+                        } else {
+                            item = null;
+                        }
+                        break;
+                    case 'title':
+                        if (item.text) {
+                            item = {
+                                type: 'script',
+                                text: prefix + '.title(' + JSON.stringify(item.text) + ');',
+                            };
+                        } else {
+                            item = null;
+                        }
+                        break;
+                    case 'meta':
+                        if (item.text) {
+                            item = {
+                                type: 'script',
+                                text: prefix + '.meta(' + JSON.stringify(item.text) + ');',
+                            }
+                        } else {
+                            item = null;
+                        }
+                        break;
+                    case 'link':
+                        if (item.text) {
+                            item = {
+                                type: 'script',
+                                text: prefix + '.link(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
+                            };
+                        } else {
+                            // Remove comments
+                            item = null;
+                        }
+                        break;
+                    case 'style':
+                        if (item.text) {
+                            item = {
+                                type: 'script',
+                                text: prefix + '.style(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
+                            }
+                        } else {
+                            // Remove comments
+                            item = null;
+                        }
+                        break;
                     case 'comment':
                         if (!opts.ignoreComments) {
                             item = {
                                 type: 'script',
-                                text: opts.prefix + '.comment(' + parentIdent + ',' + JSON.stringify(item.text) + ');',
+                                text: prefix + '.comment(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
                             };
                         } else {
                             // Remove comments
@@ -340,7 +400,7 @@ var HtmlCompiler = {
                     case 'html':
                         item = {
                             type: 'script',
-                            text: opts.prefix + '.html(' + parentIdent + ',' + JSON.stringify(item.text) + ');',
+                            text: prefix + '.html(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
                         };
                         break;
                 }
