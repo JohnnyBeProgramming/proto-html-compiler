@@ -1,6 +1,6 @@
 {
   "name": "proto-html-compiler",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Prototyped HTML DOM Parser and compiler",
   "main": "HtmlCompiler.js",
   "scripts": {
@@ -15,7 +15,11 @@
     "html",
     "compiler"
   ],
-  "author": "Johnathan Lodder <Johnathan.Lodder@Gmail.com> (http://www.prototyped.info/)",
+  "author": {
+    "name": "Johnathan Lodder",
+    "email": "Johnathan.Lodder@Gmail.com",
+    "url": "http://www.prototyped.info/"
+  },
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/JohnnyBeProgramming/proto-html-compiler/issues"

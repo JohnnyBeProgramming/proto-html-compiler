@@ -1,6 +1,5 @@
 ﻿var sp = require('proto-js-string');
 var path = require('path');
-var fs = require('fs');
 var q = require('q');
 
 var toHtml = require('htmlparser-to-html');
@@ -22,7 +21,10 @@ var defaults = {
         // Functions to exclude....
         //'console.log', 
     ],
+    templHtml: path.join(__dirname || '', './templates/Compiler.template.html'),
+    templPathJS: path.join(__dirname || '', './templates/Compiler.template.js'),
 };
+
 var HtmlCompiler = {
     opts: defaults,
     spx: new sp(),
@@ -47,23 +49,16 @@ var HtmlCompiler = {
         return hash;
     },
 
-    init: function (options) {
+    init: function (options, fs) {
         try {
             HtmlCompiler.opts = defaults;
             HtmlCompiler.opts = HtmlCompiler.ctx(options);
+            HtmlCompiler.opts.fs = fs;
         }
         catch (ex) {
             console.log('Error: ' + ex.message)
         }
         return HtmlCompiler.opts;
-    },
-
-    html: function (file, contents, options) {
-        return HtmlCompiler
-            .gen(file, contents, options)
-            .then(function (output) {
-                return HtmlCompiler.genFile(file, output, options);
-            });
     },
 
     gen: function (file, contents, options) {
@@ -110,35 +105,10 @@ var HtmlCompiler = {
         return deferred.promise;
     },
 
-    genFile: function (filename, output, options) {
-
-        // Generate Data (sync)
-        HtmlCompiler.genJSON(filename, output, options);
-
-        // Generate the compiled script (async)
-        return HtmlCompiler.genScript(filename, output, options);
-    },
-
-    genJSON: function (filename, output, options) {
-        var opts = HtmlCompiler.ctx(options);
-        var contents = JSON.stringify(output, null, 4);
-        var targetPath = path.join((opts.dest || process.cwd()), 'data/');
-        var targetJSON = path.join(targetPath, filename + '.json');
-        if (!fs.existsSync(targetPath)) {
-            fs.mkdirSync(targetPath);
-        }
-        fs.writeFileSync(targetJSON, contents);
-    },
-
     genScript: function (filename, output, options) {
         var q = require('q');
         var deferred = q.defer();
         var opts = HtmlCompiler.ctx(options);
-
-        var targetPath = path.join((opts.dest || process.cwd()), 'script/');
-        if (!fs.existsSync(targetPath)) {
-            fs.mkdirSync(targetPath);
-        }
 
         try {
             // Parse the contents and resolve promise
@@ -189,6 +159,89 @@ var HtmlCompiler = {
         return fileContents;
     },
 
+    genTemplate: function (fileContents, vendorScripts, options) {
+        var opts = HtmlCompiler.ctx(options);
+        var defaultTemplate = 'var payload = ' + JSON.stringify(fileContents, null, 4);
+        try {
+            // Check for template
+            var templPathJS = opts.templPathJS;
+            if (!templPathJS) return defaultTemplate;
+            if (path.resolve(templPathJS) != path.normalize(templPathJS)) {
+                templPathJS = path.join(process.cwd(), templPathJS);
+            }
+
+            // Parse the pre-defined scripting template...
+            if (opts.fs && fileContents && templPathJS) {
+                if (!opts.fs.existsSync(templPathJS)) return defaultTemplate;
+                var contents = opts.fs.readFileSync(templPathJS, 'utf-8').replace(/^\uFEFF/, '');
+                var payload = fileContents;
+                var encodePayload = true;
+                if (encodePayload) {
+                    var jsonEnc = HtmlCompiler.spx.encoders.base64.encode(fileContents);
+                    payload = '\'' + jsonEnc + '\'';
+                }
+
+                fileContents = !contents ? contents : contents
+                    .replace(/___ctx___/g, opts.prefix)
+                    .replace('/*{0}*/', payload || '')
+                    .replace('/*{1}*/', vendorScripts || '')
+                    .replace('/*{2}*/', '')
+            }
+        } catch (ex) {
+            console.log('Error: ' + ex.message);
+        }
+        return fileContents;
+    },
+
+    genIndex: function (targetFile, targets, options) {
+        var opts = HtmlCompiler.ctx(options);
+        if (opts.fs) {
+            var templHtml = opts.templHtml;
+            if (!templHtml) return false;
+            if (path.resolve(templHtml) != path.normalize(templHtml)) {
+                templHtml = path.join(process.cwd(), templHtml);
+            }
+            if (!opts.fs.existsSync(templHtml)) {
+                console.log(' - Warning: Template file not found: ' + templHtml);
+                return false;
+            }
+
+            var links = '';
+            var list = [];
+            for (var filename in targets) {
+                list.push(filename);
+            }
+
+            try {
+                var output = opts.fs.readFileSync(templHtml, 'utf-8');
+                list.sort().forEach(function (filename) {
+                    var jscript = targets[filename];
+                    var style = 'width: 200px; margin-right: 8px;';
+                    var css = 'btn btn-lg btn-default pull-left';
+                    if (jscript) {
+                        jscript
+                            .replace(/(\/\*[\w\'\s\r\n\*]*\*\/)|(\/\/[\w\s\']*)|(\<![\-\-\s\w\>\/]*\>)/g, '')
+                            .replace(/( *\r\n *)/g, '')
+
+                        links += '<li><a class="' + css + '" style="' + style + '" href=\'javascript:' + jscript + '\'>'
+                               + filename.replace(/(\.html)$/i, '')
+                               + '</a></li>';
+                    }
+                });
+
+                var placeholder = '<li><a href="javascript:void()">Placeholder</a></li>';
+                var result = output
+                                .replace(placeholder, links)
+                                .replace(/( *\r\n *)/g, '');
+
+                opts.fs.writeFileSync(targetFile, result);
+            } catch (ex) {
+                console.log('Error: ' + ex.message);
+                throw ex;
+            }
+        }
+    },
+
     expandElem: function (item) {
         return toHtml(item);
     },
@@ -236,17 +289,23 @@ var HtmlCompiler = {
                         var data = item.attribs;
                         var isUrl = item.attribs && item.attribs.href;
                         if (isUrl && item.attribs.rel == 'stylesheet') {
-                            // Try and fetch local file
-                            var relPath = item.attribs.href;
-                            var filePath = path.join(opts.base, relPath);
-                            if (fs.existsSync(filePath)) {
-                                var buffer = fs.readFileSync(filePath, 'utf8');
-                                isUrl = false;
-                                type = 'style';
-                                data = buffer;
-                            } else {
-                                type = 'link';
-                                data = item.attribs;
+                            try {
+                                if (opts.fs) {
+                                    // Try and fetch local file
+                                    var relPath = item.attribs.href;
+                                    var filePath = path.join(opts.base, relPath);
+                                    if (opts.fs.existsSync(filePath)) {
+                                        var buffer = opts.fs.readFileSync(filePath, 'utf8');
+                                        isUrl = false;
+                                        type = 'style';
+                                        data = buffer;
+                                    } else {
+                                        type = 'link';
+                                        data = item.attribs;
+                                    }
+                                }
+                            } catch (ex) {
+                                console.log('Error: ' + ex.message);
                             }
                         }
 
@@ -281,9 +340,9 @@ var HtmlCompiler = {
                 if (isUrl) {
                     // Try and fetch local file
                     var filePath = path.join(opts.base, data);
-                    if (fs.existsSync(filePath)) {
+                    if (opts.fs && opts.fs.existsSync(filePath)) {
                         try {
-                            var buffer = fs.readFileSync(filePath, 'utf8');
+                            var buffer = opts.fs.readFileSync(filePath, 'utf8');
                             isUrl = false;
                             data = buffer;
                         } catch (ex) {
@@ -294,9 +353,15 @@ var HtmlCompiler = {
                     }
                 }
 
+                var cond = '';
+                var condAttr = 'compiler-condition';
+                if (item.attribs && condAttr in item.attribs) {
+                    cond = 'if (' + item.attribs[condAttr] + ') ';
+                }
+
                 output = {
                     type: 'script',
-                    text: prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
+                    text: cond + prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
                 };
 
                 break;
