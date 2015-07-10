@@ -353,12 +353,7 @@ var HtmlCompiler = {
                     }
                 }
 
-                var cond = '';
-                var condAttr = 'compiler-condition';
-                if (item.attribs && condAttr in item.attribs) {
-                    cond = 'if (' + item.attribs[condAttr] + ') ';
-                }
-
+                var cond = HtmlCompiler.scriptCondition(item.attribs);
                 output = {
                     type: 'script',
                     text: cond + prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
@@ -386,9 +381,24 @@ var HtmlCompiler = {
                 break;
             default:
                 console.log('   ? [UNKNOWN ELEM]: ', item);
+                /*
+                output = {
+                    type: 'html',
+                    text: item.data,
+                };
+                */
                 break;
         }
         return output;
+    },
+
+    scriptCondition: function (attrs) {
+        var cond = '';
+        var condAttr = 'html-compile';
+        if (attrs && condAttr in attrs) {
+            cond = 'if (' + attrs[condAttr] + ') ';
+        }
+        return cond;
     },
 
     scriptElems: function (output, parentIdent, options) {
@@ -431,9 +441,10 @@ var HtmlCompiler = {
                         break;
                     case 'link':
                         if (item.text) {
+                            var cond = HtmlCompiler.scriptCondition(item.text);
                             item = {
                                 type: 'script',
-                                text: prefix + '.link(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
+                                text: cond + prefix + '.link(' + JSON.stringify(item.text) + ', ' + parentIdent + ');',
                             };
                         } else {
                             // Remove comments
