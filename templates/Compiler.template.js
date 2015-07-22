@@ -27,6 +27,10 @@
                     encoders.base64 = spx.encoders.base64;
                     module.exports = null;
                 }
+
+                // Include: Remote Script Loader
+                /*{2}*/
+
                 // Link included module
                 if (module.exports) {
                     module.exports = null;

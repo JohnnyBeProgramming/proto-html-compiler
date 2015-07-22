@@ -152,14 +152,13 @@ var HtmlCompiler = {
             var minified = UglifyJS.minify(fileContents, prefs);
 
             fileContents = minified.code;
-
         } catch (ex) {
             console.log(' - Error: ' + ex.message);
         }
         return fileContents;
     },
 
-    genTemplate: function (fileContents, vendorScripts, options) {
+    genTemplate: function (fileContents, vendorScripts, appScripts, options) {
         var opts = HtmlCompiler.ctx(options);
         var defaultTemplate = 'var payload = ' + JSON.stringify(fileContents, null, 4);
         try {
@@ -181,11 +180,11 @@ var HtmlCompiler = {
                     payload = '\'' + jsonEnc + '\'';
                 }
 
-                fileContents = !contents ? contents : contents
+                fileContents = (contents || '')
                     .replace(/___ctx___/g, opts.prefix)
                     .replace('/*{0}*/', payload || '')
                     .replace('/*{1}*/', vendorScripts || '')
-                    .replace('/*{2}*/', '')
+                    .replace('/*{2}*/', appScripts || '')
             }
         } catch (ex) {
             console.log('Error: ' + ex.message);
@@ -217,13 +216,11 @@ var HtmlCompiler = {
                 list.sort().forEach(function (filename) {
                     var jscript = targets[filename];
                     var style = 'width: 200px; margin-right: 8px;';
-                    var css = 'btn btn-lg btn-default pull-left';
+                    var css = 'btn btn-lg btn-primary pull-left';
                     if (jscript) {
-                        jscript
-                            .replace(/(\/\*[\w\'\s\r\n\*]*\*\/)|(\/\/[\w\s\']*)|(\<![\-\-\s\w\>\/]*\>)/g, '')
-                            .replace(/( *\r\n *)/g, '')
+                        jscript = escape(jscript);
 
-                        links += '<li><a class="' + css + '" style="' + style + '" href=\'javascript:' + jscript + '\'>'
+                        links += '<li><a class="' + css + '" style="' + style + '" href="javascript:' + jscript + '">'
                                + filename.replace(/(\.html)$/i, '')
                                + '</a></li>';
                     }
@@ -231,8 +228,7 @@ var HtmlCompiler = {
 
                 var placeholder = '<li><a href="javascript:void()">Placeholder</a></li>';
                 var result = output
-                                .replace(placeholder, links)
-                                .replace(/( *\r\n *)/g, '');
+                                .replace(placeholder, links);
 
                 opts.fs.writeFileSync(targetFile, result);
             } catch (ex) {

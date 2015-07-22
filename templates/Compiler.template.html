@@ -7,18 +7,50 @@
         @import url("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css");
         @import 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css';
     </style>
+    <!--
+    -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'">
 </head>
 <body style="margin: 8px;">
+
     <div class="thumbnail">
         <h2 style="margin: 4px;">
-            <i class="glyphicon glyphicon-duplicate"></i>&nbsp;Compiler Output
+            <i class="glyphicon glyphicon-duplicate"></i> <span>Compiler Output</span>
         </h2>
     </div>
+
+    <div class="thumbnail" style="padding: 16px;">
+        <div class="btn-group btn-group-sm" role="group" aria-label="...">
+            <a class="btn btn-default" onclick="define('https://code.jquery.com/jquery-2.1.4.min.js', function (url) { return typeof jQuery !== 'undefined' }, function (url, info) { console.debug(' - JQuery loaded:', info.state); });">
+                <i class="fa fa-cloud-download" style="margin-right: 4px;"></i>jQuery
+            </a>
+            <a class="btn btn-default" onclick="define('https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js', function (url) { return typeof angular !== 'undefined' }, function (url, info) { console.debug(' - AngularJS loaded:', info.state); });">
+                <i class="fa fa-cloud-download" style="margin-right: 4px;"></i>AngularJS
+            </a>
+        </div>
+    </div>
+
     <div class="thumbnail" style="padding: 16px;">
         <ul style="list-style-type: none; padding: 0;">
             <li><a href="javascript:void()">Placeholder</a></li>
         </ul>
         <br style="clear: both; display: inline-block;" />
     </div>
+
+    <!------------------------------------------------------------------------->
+    <script src="ScriptLoader.js"></script>
+    <script>
+
+        function define(urls, qry, callback, elem) {
+            if (typeof remoteScripts !== 'undefined') {
+                remoteScripts.define(urls, qry, callback);
+            } else {
+                alert('Script Loader not loaded');
+            }
+        }
+
+    </script>
+    <!------------------------------------------------------------------------->
+
 </body>
 </html>
