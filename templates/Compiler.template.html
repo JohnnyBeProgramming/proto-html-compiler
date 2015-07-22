@@ -3,9 +3,9 @@
 <head>
     <title>Compiler Output</title>
     <style>
-        @import url("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css");
-        @import url("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css");
-        @import 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css';
+        @import url('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css');
+        @import url('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css');
     </style>
     <!--
     -->
@@ -19,18 +19,20 @@
         </h2>
     </div>
 
-    <div class="thumbnail" style="padding: 16px;">
+    <div class="thumbnail" style="padding: 8px;">
         <div class="btn-group btn-group-sm" role="group" aria-label="...">
-            <a class="btn btn-default" onclick="define('https://code.jquery.com/jquery-2.1.4.min.js', function (url) { return typeof jQuery !== 'undefined' }, function (url, info) { console.debug(' - JQuery loaded:', info.state); });">
-                <i class="fa fa-cloud-download" style="margin-right: 4px;"></i>jQuery
+            <a class="btn btn-default" href="https://code.jquery.com/jquery-2.1.4.min.js" onclick="return inject(this, function () { return typeof jQuery !== 'undefined' });">
+                <i class="fa fa-cloud-download" style="margin-right: 4px;"></i>
+                jQuery
             </a>
-            <a class="btn btn-default" onclick="define('https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js', function (url) { return typeof angular !== 'undefined' }, function (url, info) { console.debug(' - AngularJS loaded:', info.state); });">
-                <i class="fa fa-cloud-download" style="margin-right: 4px;"></i>AngularJS
+            <a class="btn btn-default" href="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js" onclick="return inject(this, function () { return typeof angular !== 'undefined' });">
+                <i class="fa fa-cloud-download" style="margin-right: 4px;"></i>
+                AngularJS
             </a>
         </div>
     </div>
 
-    <div class="thumbnail" style="padding: 16px;">
+    <div class="thumbnail" style="padding: 8px;">
         <ul style="list-style-type: none; padding: 0;">
             <li><a href="javascript:void()">Placeholder</a></li>
         </ul>
@@ -41,12 +43,28 @@
     <script src="ScriptLoader.js"></script>
     <script>
 
-        function define(urls, qry, callback, elem) {
-            if (typeof remoteScripts !== 'undefined') {
-                remoteScripts.define(urls, qry, callback);
-            } else {
-                alert('Script Loader not loaded');
+        function inject(elem, qry) {
+            if (!elem) return;
+            try {
+                if (typeof remoteScripts !== 'undefined') {
+                    elem.className = 'btn btn-default disabled';
+                    remoteScripts.define(elem.href, qry || null, function (url, info) {
+                        if (info.state === true) {
+                            elem.className = 'btn btn-success';
+                        } else if (info.state === false) {
+                            elem.className = 'btn btn-danger';
+                        } else if (info.state === null) {
+                            elem.className = 'btn btn-warning';
+                        }
+                    });
+                } else {
+                    throw new Error('Script Loader not defined');
+                }
+            } catch (ex) {
+                elem.className = 'btn btn-danger';
+                throw ex;
             }
+            return false;
         }
 
     </script>

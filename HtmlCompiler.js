@@ -215,12 +215,13 @@ var HtmlCompiler = {
                 var output = opts.fs.readFileSync(templHtml, 'utf-8');
                 list.sort().forEach(function (filename) {
                     var jscript = targets[filename];
-                    var style = 'width: 200px; margin-right: 8px;';
+                    var style = 'width: 128px; margin-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
                     var css = 'btn btn-lg btn-primary pull-left';
                     if (jscript) {
                         jscript = escape(jscript);
 
                         links += '<li><a class="' + css + '" style="' + style + '" href="javascript:' + jscript + '">'
+                               + '<div><i class="fa fa-cloud-download faa-float animated-hover fa-4x"></i></div>'
                                + filename.replace(/(\.html)$/i, '')
                                + '</a></li>';
                     }
@@ -329,10 +330,14 @@ var HtmlCompiler = {
                 break;
             case 'script':
                 var isUrl = item.attribs && item.attribs.src ? true : false;
+                var cond = HtmlCompiler.scriptCondition(item.attribs);
                 var data = isUrl
                             ? item.attribs.src
                             : (item.children.length ? item.children[0].data : null);
 
+                var parent = parentIdent || 'null';
+                var ready = 'null';
+                var detect = cond ? 'function() { ' + cond + ' { return false; } else { return true; } }' : 'null';
                 if (isUrl) {
                     // Try and fetch local file
                     var filePath = path.join(opts.base, data);
@@ -349,10 +354,9 @@ var HtmlCompiler = {
                     }
                 }
 
-                var cond = HtmlCompiler.scriptCondition(item.attribs);
                 output = {
                     type: 'script',
-                    text: cond + prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ');',
+                    text: prefix + '.script(' + JSON.stringify(data) + ', ' + JSON.stringify(isUrl) + ', ' + parent + ', ' + ready + ', ' + detect + ');',
                 };
 
                 break;

@@ -33,6 +33,7 @@
 
                 // Link included module
                 if (module.exports) {
+                    window.ScriptLoader = module.exports;
                     module.exports = null;
                 }
             },
@@ -116,18 +117,22 @@
                 style.textContent = contents;
                 (parentElem || document.head).appendChild(style);
             },
-            script: function (input, isUrl, parentElem, callback) {
+            script: function (input, isUrl, parentElem, callback, detect) {
                 if (isUrl) {
                     // This is an import url
                     var isDone = false;
                     var url = input.toString();
-                    input['']().inject(function (ctx) {
-                        if (callback) callback(input);
-                    }, false, parentElem || document.body);
+                    if (typeof ScriptLoader !== 'undefined') {
+                        ScriptLoader.define(url, detect || null, callback, parentElem || document.body);
+                    } else {
+                        input['']().inject(function (ctx) {
+                            if (callback) callback(input, { state: true, parent: parentElem });
+                        }, false, parentElem || document.body);
+                    }
                 } else {
                     // This is javascript contents
                     input['']().script(parentElem || document.body);
-                    if (callback) callback(input);
+                    if (callback) callback(input, { state: true, parent: parentElem });
                 }
             },
             load: function (payload) {
@@ -199,7 +204,7 @@
 
         ctx.queue = {
             buffer: [],
-            delay: 10 * 1000, //2 * 60 * 1000,
+            delay: 2 * 60 * 1000, // 2 mins
             async: typeof Promise === 'function',
             attach: function (func) {
                 var action = ctx.queue.async ? function () {
@@ -304,17 +309,30 @@
                     }, ctx.queue.delay);
                 });
             },
-            script: function (input, isUrl, parentElem, callback) {
+            script: function (input, isUrl, parentElem, callback, detect) {
                 return ctx.queue.attach(function (resolve, reject) {
                     var done = false;
-                    var result = ctx.script(input, isUrl, parentElem, function (result) {
-                        done = true;
-                        resolve(result);
-                        if (callback) callback(result);
-                    });
+                    var result = ctx.script(input, isUrl, parentElem, function (url, info) {
+                        if (info.state === true) {
+                            // Script Loaded
+                            done = true;
+                            resolve(input);
+                            if (callback) callback(input, true);
+                        } else if (info.state === false) {
+                            // Loading failed
+                            done = true;
+                            reject(new Error('Promised <script> failed to load.'));
+                            if (callback) callback(input, false);
+                        } else if (info.state === null) {
+                            // Still busy or blocked, wait for timeout
+                        }
+                    }, detect);
                     var intv = setInterval(function () {
                         clearInterval(intv);
-                        if (!done) {
+                        if (done) return;
+                        if (detect && detect()) {
+                            resolve(input);
+                        } else {
                             reject(new Error('Promised <script> timed out.'));
                         }
                     }, ctx.queue.delay);
