@@ -1,6 +1,6 @@
 {
   "name": "proto-html-compiler",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "description": "Prototyped HTML DOM Parser and compiler",
   "main": "HtmlCompiler.js",
   "scripts": {
@@ -31,5 +31,8 @@
     "proto-js-string": "^1.0.0",
     "q": "^1.4.1",
     "uglify-js": "^2.4.23"
+  },
+  "devDependencies": {
+    "proto-js-loader": "0.0.1"
   }
 }
