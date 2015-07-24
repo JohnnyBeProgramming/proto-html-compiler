@@ -219,8 +219,9 @@ var HtmlCompiler = {
                     var css = 'btn btn-lg btn-primary pull-left';
                     if (jscript) {
                         jscript = escape(jscript);
+                        jscript = 'javascript:(function(){' + jscript + '})()';
 
-                        links += '<li><a class="' + css + '" style="' + style + '" href="javascript:' + jscript + '">'
+                        links += '<li><a class="' + css + '" style="' + style + '" href="' + jscript + '">'
                                + '<div><i class="fa fa-cloud-download faa-float animated-hover fa-4x"></i></div>'
                                + filename.replace(/(\.html)$/i, '')
                                + '</a></li>';

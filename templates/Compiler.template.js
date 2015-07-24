@@ -29,7 +29,11 @@
                 }
 
                 // Include: Remote Script Loader
-                /*{2}*/
+                if (typeof remoteScripts === 'undefined') {
+                    /*{2}*/
+                } else {
+                    module.exports = null;
+                }
 
                 // Link included module
                 if (module.exports) {
@@ -38,6 +42,8 @@
                 }
             },
             reset: function () {
+                ctx.errors = [];
+
                 if (ctx.state) {
                     document.head.innerHTML = ctx.state.head;
                     document.body.innerHTML = ctx.state.body;
@@ -118,22 +124,23 @@
                 (parentElem || document.head).appendChild(style);
             },
             script: function (input, isUrl, parentElem, callback, detect) {
-                if (isUrl) {
+                var url = input.toString();
+                if (typeof ScriptLoader !== 'undefined') {
+                    // Use script loader for loading scripts
+                    ScriptLoader.define(url, detect || null, callback, parentElem || document.body);
+                } else if (isUrl) {
                     // This is an import url
-                    var isDone = false;
-                    var url = input.toString();
-                    if (typeof ScriptLoader !== 'undefined') {
-                        ScriptLoader.define(url, detect || null, callback, parentElem || document.body);
-                    } else {
-                        input['']().inject(function (ctx) {
-                            if (callback) callback(input, { state: true, parent: parentElem });
-                        }, false, parentElem || document.body);
-                    }
+                    input['']().inject(function (ctx) {
+                        if (callback) callback(input, { state: true, parent: parentElem });
+                    }, false, parentElem || document.body);
                 } else {
-                    // This is javascript contents
+                    // This is an inline function
                     input['']().script(parentElem || document.body);
                     if (callback) callback(input, { state: true, parent: parentElem });
                 }
+            },
+            marshal: function () {
+
             },
             load: function (payload) {
                 if (payload) {
@@ -177,9 +184,7 @@
                         var queue = window.___ctx___.queue;
                         if (queue && queue.buffer && queue.buffer.length) {
                             console.debug(' - Running queued...');
-                            queue.commit(function () {
-                                ctx.ready(true);
-                            });
+                            queue.commit();
                         } else {
                             ctx.ready(true);
                         }
@@ -193,18 +198,22 @@
                 }
             },
             ready: function (success) {
-                if (success) {
-                    console.debug(' - Ready.');
-                } else {
-                    console.debug(' - Not Ready.');
+                if (ctx.errors && ctx.errors.length) {
+                    console.groupCollapsed('Warning: Some scripts might not have loaded.');
+                    ctx.errors.forEach(function (err) {
+                        console.error(err);
+                    });
+                    console.groupEnd();
                 }
+
                 ctx.busy = !success;
             },
+            errors: [],
         };
 
         ctx.queue = {
             buffer: [],
-            delay: 2 * 60 * 1000, // 2 mins
+            delay: 20 * 1000,//2 * 60 * 1000, // 2 mins
             async: typeof Promise === 'function',
             attach: function (func) {
                 var action = ctx.queue.async ? function () {
@@ -312,6 +321,7 @@
             script: function (input, isUrl, parentElem, callback, detect) {
                 return ctx.queue.attach(function (resolve, reject) {
                     var done = false;
+                    var desc = isUrl ? input : JSON.stringify(input.substring(0, input.length > 100 ? 100 : input.length).replace(/ *\r\n */g, ' ') + '...');
                     var result = ctx.script(input, isUrl, parentElem, function (url, info) {
                         if (info.state === true) {
                             // Script Loaded
@@ -321,7 +331,7 @@
                         } else if (info.state === false) {
                             // Loading failed
                             done = true;
-                            reject(new Error('Promised <script> failed to load.'));
+                            reject(new Error('Promised <script> failed to load.' + '\r\n' + desc));
                             if (callback) callback(input, false);
                         } else if (info.state === null) {
                             // Still busy or blocked, wait for timeout
@@ -333,7 +343,7 @@
                         if (detect && detect()) {
                             resolve(input);
                         } else {
-                            reject(new Error('Promised <script> timed out.'));
+                            reject(new Error('Promised <script> timed out.' + '\r\n' + desc));
                         }
                     }, ctx.queue.delay);
                 });
@@ -345,6 +355,8 @@
                 var pending = null;
                 if (ctx.queue.buffer && ctx.queue.buffer.length) {
                     var nextCall = ctx.queue.buffer[0];
+                    ctx.queue.buffer.splice(0, 1);
+
                     if (typeof nextCall === 'function') {
                         pending = nextCall(); // Call next action
 
@@ -354,23 +366,24 @@
                                 while (!ctx.queue.step() && ctx.queue.buffer.length);
                             }, function (error) {
                                 if (confirm(error.message + '\r\nContinue Loading?')) {
+                                    ctx.errors.push(error);
                                     do { /* Process next queued item */ }
                                     while (!ctx.queue.step() && ctx.queue.buffer.length);
                                 } else {
+                                    console.warn('Warning: User canceled.')
+                                    ctx.ready(false);
                                     throw error;
                                 }
                             });
                         } else {
                             pending = null; // Run next
                         }
+
+                        if (!ctx.queue.buffer.length) {
+                            ctx.ready(true);
+                        }
                     } else {
                         throw new Error('Expected queued action to be a function.');
-                    }
-
-                    ctx.queue.buffer.splice(0, 1);
-
-                    if (!ctx.queue.buffer.length) {
-                        ctx.ready(true);
                     }
                 }
                 return pending;
