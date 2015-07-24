@@ -29,7 +29,11 @@
                 }
 
                 // Include: Remote Script Loader
-                /*{2}*/
+                if (typeof remoteScripts === 'undefined') {
+                    /*{2}*/
+                } else {
+                    module.exports = null;
+                }
 
                 // Link included module
                 if (module.exports) {
