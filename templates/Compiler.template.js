@@ -213,7 +213,7 @@
 
         ctx.queue = {
             buffer: [],
-            delay: 20 * 1000,//2 * 60 * 1000, // 2 mins
+            delay: 2 * 60 * 1000, // 2 mins
             async: typeof Promise === 'function',
             attach: function (func) {
                 var action = ctx.queue.async ? function () {
@@ -391,11 +391,11 @@
             commit: function () {
                 var isReady = true;
                 if (ctx.queue.async) {
-                    console.debug(' - Queued:', ctx.queue.buffer.length);
+                    console.log(' - Running queued actions:', ctx.queue.buffer.length);
                 } else if (confirm('Warning: Application might not run correctly.\r\nContinue?')) {
-                    console.debug(' - Orderly:', ctx.queue.buffer.length);
+                    console.log(' - Running actions:', ctx.queue.buffer.length);
                 } else {
-                    console.debug(' - Canceled.');
+                    console.debug(' - User Canceled.');
                     isReady = false;
                 }
 

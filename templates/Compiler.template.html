@@ -7,13 +7,21 @@
         @import url('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css');
         @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css');
     </style>
+    <!-- Content-Security-Policy: http://www.html5rocks.com/en/tutorials/security/content-security-policy/ -->
     <!--
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; object-src 'none'">
-    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self';">
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests;">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none';">
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'; connect-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'; connect-src 'none'; style-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'; connect-src 'none'; style-src 'none'; font-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'; connect-src 'none'; style-src 'none'; font-src 'none'; base-uri 'none';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none'; object-src 'none'; connect-src 'none'; base-uri 'self';">
+    -->     
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'; child-src 'none';">
 </head>
 <body style="margin: 8px;">
-
     <div class="thumbnail">
         <h2 style="margin: 4px;">
             <i class="glyphicon glyphicon-duplicate"></i> <span>Compiler Output</span>
@@ -70,6 +78,6 @@
 
     </script>
     <!------------------------------------------------------------------------->
-
+    
 </body>
 </html>
