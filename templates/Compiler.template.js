@@ -321,8 +321,8 @@
             script: function (input, isUrl, parentElem, callback, detect) {
                 return ctx.queue.attach(function (resolve, reject) {
                     var done = false;
-                    var desc = isUrl ? input : JSON.stringify(input.substring(0, input.length > 100 ? 100 : input.length).replace(/ *\r\n */g, ' ') + '...');
-                    var result = ctx.script(input, isUrl, parentElem, function (url, info) {
+                    var result = ctx.script(input, isUrl, parentElem, function (url, info, ex) {
+                        var desc = info.url + '\r\n' + (ex ? ex.message : null || '') + '\r\n';
                         if (info.state === true) {
                             // Script Loaded
                             done = true;
@@ -365,15 +365,21 @@
                                 do { /* Process next queued item */ }
                                 while (!ctx.queue.step() && ctx.queue.buffer.length);
                             }, function (error) {
+                                // Note: We let the loading continue anyway...
+                                ctx.errors.push(error);
+                                do { /* Process next queued item */ }
+                                while (!ctx.queue.step() && ctx.queue.buffer.length);
+                                return;
+                                /*
                                 if (confirm(error.message + '\r\nContinue Loading?')) {
                                     ctx.errors.push(error);
-                                    do { /* Process next queued item */ }
-                                    while (!ctx.queue.step() && ctx.queue.buffer.length);
+                                    do { } while (!ctx.queue.step() && ctx.queue.buffer.length);
                                 } else {
                                     console.warn('Warning: User canceled.')
                                     ctx.ready(false);
                                     throw error;
                                 }
+                                */
                             });
                         } else {
                             pending = null; // Run next
@@ -385,6 +391,8 @@
                     } else {
                         throw new Error('Expected queued action to be a function.');
                     }
+                } else {
+                    console.log(' - Application Bootstrapped.');
                 }
                 return pending;
             },
