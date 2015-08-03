@@ -343,7 +343,7 @@
                         if (detect && detect()) {
                             resolve(input);
                         } else {
-                            reject(new Error('Promised <script> timed out.' + '\r\n' + desc));
+                            reject(new Error('Promised <script> timed out.' + '\r\n' + isUrl ? input : ''));
                         }
                     }, ctx.queue.delay);
                 });

@@ -1,6 +1,6 @@
 {
   "name": "proto-html-compiler",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Prototyped HTML DOM Parser and compiler",
   "main": "HtmlCompiler.js",
   "scripts": {
